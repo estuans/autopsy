@@ -32,7 +32,7 @@ import org.sleuthkit.autopsy.ingest.IngestModuleIngestJobSettings;
 @ServiceProvider(service = IngestModuleFactory.class)
 public class PhotoRecCarverIngestModuleFactory extends IngestModuleFactoryAdapter {
 
-    private static final String VERSION = "7.0";
+    private static final String VERSION = "8.0";
 
     /**
      * Gets the ingest module name for use within this package.
@@ -40,12 +40,12 @@ public class PhotoRecCarverIngestModuleFactory extends IngestModuleFactoryAdapte
      * @return A name string.
      */
     static String getModuleName() {
-        return NbBundle.getMessage(PhotoRecCarverIngestModuleFactory.class, "moduleDisplayName.text");
+        return NbBundle.getMessage(PhotoRecCarverIngestModuleFactory.class, "moduleName.text");
     }
 
     @Override
     public String getModuleDisplayName() {
-        return PhotoRecCarverIngestModuleFactory.getModuleName();
+        return NbBundle.getMessage(PhotoRecCarverIngestModuleFactory.class, "moduleDisplayName.text");
     }
 
     @Override

@@ -1,9 +1,0 @@
-# List of plugins for the Registry Ripper
-
-#-------------------------------------
-# system
-autopsyusb
-autopsyprocarchitecture
-#autopsyusbdevices
-autopsycompname
-autopsyprofiler

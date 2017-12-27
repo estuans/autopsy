@@ -74,10 +74,11 @@ import org.sleuthkit.datamodel.TskData;
     "cannotRunExecutable.message=Unable to execute PhotoRec.",
     "PhotoRecIngestModule.nonHostnameUNCPathUsed=PhotoRec cannot operate with a UNC path containing IP addresses."
 })
+
 final class PhotoRecCarverFileIngestModule implements FileIngestModule {
 
     private static final String PHOTOREC_DIRECTORY = "photorec_exec"; //NON-NLS
-    private static final String PHOTOREC_EXECUTABLE = "photorec_win.exe"; //NON-NLS
+    private static final String PHOTOREC_EXECUTABLE = "photorec_lin"; //NON-NLS
     private static final String PHOTOREC_RESULTS_BASE = "results"; //NON-NLS
     private static final String PHOTOREC_RESULTS_EXTENDED = "results.1"; //NON-NLS
     private static final String PHOTOREC_REPORT = "report.xml"; //NON-NLS
@@ -136,7 +137,11 @@ final class PhotoRecCarverFileIngestModule implements FileIngestModule {
 
         this.rootOutputDirPath = createModuleOutputDirectoryForCase();
 
-        Path execName = Paths.get(PHOTOREC_DIRECTORY, PHOTOREC_EXECUTABLE);
+        Path execName;
+        execName = Paths.get(PHOTOREC_DIRECTORY, PHOTOREC_EXECUTABLE);
+
+        System.out.println(execName.toString());
+
         executableFile = locateExecutable(execName.toString());
 
         if (PhotoRecCarverFileIngestModule.refCounter.incrementAndGet(this.jobId) == 1) {
@@ -150,7 +155,10 @@ final class PhotoRecCarverFileIngestModule implements FileIngestModule {
 
                 // A temp subdirectory is also created as a location for writing unallocated space files to disk.
                 Path tempDirPath = Paths.get(outputDirPath.toString(), PhotoRecCarverFileIngestModule.TEMP_DIR_NAME);
-                Files.createDirectory(tempDirPath);
+                Files.createDirectories(tempDirPath);
+
+                System.out.println(outputDirPath.toString());
+                System.out.println(tempDirPath.toString());
 
                 // Save the directories for the current job.
                 PhotoRecCarverFileIngestModule.pathsByJob.put(this.jobId, new WorkingPaths(outputDirPath, tempDirPath));
@@ -208,6 +216,8 @@ final class PhotoRecCarverFileIngestModule implements FileIngestModule {
             tempFilePath = Paths.get(paths.getTempDirPath().toString(), file.getName());
             ContentUtils.writeToFile(file, tempFilePath.toFile(), context::fileIngestIsCancelled);
 
+            System.out.println(String.format("Writing PhotoCarver Output to: %s",tempFilePath.toString()));
+
             if (this.context.fileIngestIsCancelled() == true) {
                 // if it was cancelled by the user, result is OK
                 logger.log(Level.INFO, "PhotoRec cancelled by user"); // NON-NLS
@@ -219,23 +229,23 @@ final class PhotoRecCarverFileIngestModule implements FileIngestModule {
             Path outputDirPath = Paths.get(paths.getOutputDirPath().toString(), file.getName());
             Files.createDirectory(outputDirPath);
             File log = new File(Paths.get(outputDirPath.toString(), LOG_FILE).toString()); //NON-NLS
+            String pathSeparator = System.getProperty("path.separator");
 
             // Scan the file with Unallocated Carver.
-            ProcessBuilder processAndSettings = new ProcessBuilder(
-                    "\"" + executableFile + "\"",
-                    "/d", // NON-NLS
-                    "\"" + outputDirPath.toAbsolutePath() + File.separator + PHOTOREC_RESULTS_BASE + "\"",
-                    "/cmd", // NON-NLS
-                    "\"" + tempFilePath.toFile() + "\"",
-                    "search");  // NON-NLS
+            ProcessBuilder processAndSettings = new ProcessBuilder(executableFile + " /debug /log /d "
+                    + outputDirPath.toAbsolutePath() + File.separator + PHOTOREC_RESULTS_BASE + " /cmd "
+                    + tempFilePath.toFile() + " search");  // NON-NLS
+            System.out.println(processAndSettings.command().toString());
 
             // Add environment variable to force PhotoRec to run with the same permissions Autopsy uses
-            processAndSettings.environment().put("__COMPAT_LAYER", "RunAsInvoker"); //NON-NLS
-            processAndSettings.redirectErrorStream(true);
-            processAndSettings.redirectOutput(Redirect.appendTo(log));
+            //processAndSettings.environment().put("__COMPAT_LAYER", "RunAsInvoker"); //NON-NLS
+            //processAndSettings.redirectErrorStream(true);
+            //processAndSettings.redirectOutput(Redirect.appendTo(log));
+            processAndSettings.inheritIO();
 
             FileIngestModuleProcessTerminator terminator = new FileIngestModuleProcessTerminator(this.context, true);
-            int exitValue = ExecUtil.execute(processAndSettings, terminator);
+            Integer exitValue = ExecUtil.execute(processAndSettings, terminator);
+            System.out.println(String.format("Finished call to PhotoCarver %s",exitValue.toString()));
 
             if (this.context.fileIngestIsCancelled() == true) {
                 // if it was cancelled by the user, result is OK
@@ -251,7 +261,7 @@ final class PhotoRecCarverFileIngestModule implements FileIngestModule {
                 return IngestModule.ProcessResult.ERROR;
             } else if (0 != exitValue) {
                 // if it failed or was cancelled by timeout, result is ERROR
-                cleanup(outputDirPath, tempFilePath);
+                //cleanup(outputDirPath, tempFilePath);
                 totals.totalItemsWithErrors.incrementAndGet();
                 logger.log(Level.SEVERE, "PhotoRec carver returned error exit value = {0} when scanning {1}", // NON-NLS
                         new Object[]{exitValue, file.getName()}); // NON-NLS
@@ -264,6 +274,8 @@ final class PhotoRecCarverFileIngestModule implements FileIngestModule {
             java.io.File oldAuditFile = new java.io.File(Paths.get(outputDirPath.toString(), PHOTOREC_RESULTS_EXTENDED, PHOTOREC_REPORT).toString()); //NON-NLS
             java.io.File newAuditFile = new java.io.File(Paths.get(outputDirPath.toString(), PHOTOREC_REPORT).toString()); //NON-NLS
             oldAuditFile.renameTo(newAuditFile);
+
+            System.out.println(oldAuditFile.getPath().toString());
 
             if (this.context.fileIngestIsCancelled() == true) {
                 // if it was cancelled by the user, result is OK
@@ -318,7 +330,8 @@ final class PhotoRecCarverFileIngestModule implements FileIngestModule {
         // cleanup the output path
         FileUtil.deleteDir(new File(outputDirPath.toString()));
         if (null != tempFilePath && Files.exists(tempFilePath)) {
-            tempFilePath.toFile().delete();
+            System.out.println(String.format("Not Tidying up: %s", tempFilePath.toString()));
+            //tempFilePath.toFile().delete();
         }
     }
 
@@ -405,6 +418,7 @@ final class PhotoRecCarverFileIngestModule implements FileIngestModule {
         Path path = Paths.get(Case.getCurrentCase().getModuleDirectory(), PhotoRecCarverIngestModuleFactory.getModuleName());
         try {
             Files.createDirectory(path);
+            System.out.println("Creating Module Output Directory: " + path);
             if (UNCPathUtilities.isUNC(path)) {
                 // if the UNC path is using an IP address, convert to hostname
                 path = uncPathUtilities.ipToHostName(path);
@@ -435,13 +449,13 @@ final class PhotoRecCarverFileIngestModule implements FileIngestModule {
      *
      * @throws IngestModuleException
      */
+
     public static File locateExecutable(String executableToFindName) throws IngestModule.IngestModuleException {
         // Must be running under a Windows operating system.
-        if (!PlatformUtil.isWindowsOS()) {
-            throw new IngestModule.IngestModuleException(Bundle.unsupportedOS_message());
-        }
+        File exeFile = null;
 
-        File exeFile = InstalledFileLocator.getDefault().locate(executableToFindName, PhotoRecCarverFileIngestModule.class.getPackage().getName(), false);
+        exeFile = InstalledFileLocator.getDefault().locate(executableToFindName, PhotoRecCarverFileIngestModule.class.getPackage().getName(), false);
+
         if (null == exeFile) {
             throw new IngestModule.IngestModuleException(Bundle.missingExecutable_message());
         }
